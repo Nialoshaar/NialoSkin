@@ -55,6 +55,10 @@ NSkin.moduleDefinitions = {
         key = "Communities", label = "Guild & Communities",
         defaultEnabled = true, optionsGroup = "windows", optionsOrder = 120,
     },
+    {
+        key = "GameMenu", label = "Game Menu",
+        defaultEnabled = true, optionsGroup = "windows", optionsOrder = 130,
+    },
 }
 
 NSkin.moduleDefinitionByKey = {}

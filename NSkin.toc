@@ -16,6 +16,7 @@ Skins\NSkin_Collections.lua
 Skins\NSkin_EncounterJournal.lua
 Skins\NSkin_Map.lua
 Skins\NSkin_Communities.lua
+Skins\NSkin_GameMenu.lua
 Skins\NSkin_FriendsList.lua
 Skins\NSkin_PVE.lua
 Skins\NSkin_GreatVault.lua
