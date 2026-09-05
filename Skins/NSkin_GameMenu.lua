@@ -6,16 +6,28 @@ local IDs = {
     Scope = "GameMenu",
     Window = "GameMenu.Window",
     ButtonPrefix = "GameMenu.Button.",
+    Settings = {
+        Scope = "SettingsPanel",
+        Window = "SettingsPanel.Window",
+        HeaderControls = "SettingsPanel.HeaderControls",
+    },
 }
 
 local initialized = false
+local settingsInitialized = false
 local applyPending = false
+local settingsApplyPending = false
 local lifecycleHooked = false
+local settingsLifecycleHooked = false
+local settingsRootTexturesConcealed = false
 local nextAnonymousButtonID = 0
 local buttonIDs = setmetatable({}, { __mode = "k" })
 
 NSkin:RegisterAppearanceScope(IDs.Scope, {
     label = "Game Menu",
+})
+NSkin:RegisterAppearanceScope(IDs.Settings.Scope, {
+    label = "Settings Panel",
 })
 
 local function IsVisible(frame)
@@ -31,6 +43,15 @@ local function QueueApply()
     end)
 end
 
+local function QueueSettingsApply()
+    if settingsApplyPending then return end
+    settingsApplyPending = true
+    C_Timer.After(0, function()
+        settingsApplyPending = false
+        GameMenuSkin:ApplySettingsPanel()
+    end)
+end
+
 local function HideDecorativeTextures(frame)
     if not frame then return end
     NSkin:HideTextureRegions(frame)
@@ -42,16 +63,18 @@ local function CopyTable(source)
     return copy
 end
 
-local function GetWindowStyle(frame)
+local function GetWindowStyle(scopeID, windowID, headerFrame,
+    fallbackHeight)
     local style = CopyTable(NSkin:GetAppearanceStyle(
-        "window", IDs.Scope, IDs.Window))
+        "window", scopeID, windowID))
     style.header = CopyTable(style.header)
 
     local configuredHeight = tonumber(style.header.height)
     if not configuredHeight or configuredHeight <= 0 then
-        local header = frame and frame.Header
-        local height = header and header.GetHeight and header:GetHeight()
-        style.header.height = tonumber(height) and height > 0 and height or 22
+        local height = headerFrame and headerFrame.GetHeight
+            and headerFrame:GetHeight()
+        style.header.height = tonumber(height) and height > 0
+            and height or fallbackHeight or 22
     end
     return style
 end
@@ -102,7 +125,8 @@ function GameMenuSkin:ApplyWindowChrome(frame)
         frame = frame,
         appearanceWindowID = IDs.Scope,
         elementID = IDs.Window,
-        style = GetWindowStyle(frame),
+        style = GetWindowStyle(
+            IDs.Scope, IDs.Window, frame.Header, 22),
         title = title,
         skinCloseButton = false,
     })
@@ -166,6 +190,54 @@ function GameMenuSkin:Apply()
     return true
 end
 
+function GameMenuSkin:ApplySettingsPanel()
+    local frame = _G.SettingsPanel
+    if not frame then return false end
+
+    -- The unnamed root texture is Options_InnerFrame. Suppress it before
+    -- creating NSkin's own root textures so subsequent refreshes cannot hide
+    -- the shared chrome.
+    if not settingsRootTexturesConcealed then
+        HideDecorativeTextures(frame)
+        settingsRootTexturesConcealed = true
+    end
+
+    -- NineSlice owns the functional title FontString. Preserve the container
+    -- and remove only its decorative regions.
+    HideDecorativeTextures(frame.NineSlice)
+    local title = frame.NineSlice and frame.NineSlice.Text
+    local closeButton = frame.ClosePanelButton
+    local chrome = NSkin:SkinStandardWindowChrome({
+        frame = frame,
+        appearanceWindowID = IDs.Settings.Scope,
+        elementID = IDs.Settings.Window,
+        headerControlsID = IDs.Settings.HeaderControls,
+        style = GetWindowStyle(IDs.Settings.Scope, IDs.Settings.Window,
+            closeButton, 24),
+        title = title,
+        closeButton = closeButton,
+        preserveArtwork = {
+            NineSlice = true,
+        },
+    })
+    if title and chrome and chrome.header then
+        title:ClearAllPoints()
+        title:SetPoint("CENTER", chrome.header, "CENTER", 0, 0)
+    end
+
+    NSkin:RegisterSkinningElement(IDs.Settings.Window, {
+        label = "Settings Panel window",
+        kind = "WINDOW",
+        module = "GameMenu",
+        appearanceWindowID = IDs.Settings.Scope,
+        window = frame,
+        target = frame,
+        priority = 0,
+        draggable = false,
+    })
+    return true
+end
+
 function GameMenuSkin:HookLifecycle(frame)
     if lifecycleHooked then return end
 
@@ -188,12 +260,34 @@ function GameMenuSkin:Initialize()
     return true
 end
 
+function GameMenuSkin:InitializeSettingsPanel()
+    local frame = _G.SettingsPanel
+    if not frame then return false end
+
+    if not settingsLifecycleHooked and frame.HookScript then
+        frame:HookScript("OnShow", QueueSettingsApply)
+        settingsLifecycleHooked = true
+    end
+    settingsInitialized = true
+    self:ApplySettingsPanel()
+    if frame:IsShown() then QueueSettingsApply() end
+    return true
+end
+
 function GameMenuSkin:RefreshAppearance()
     if initialized then self:Apply() end
+    if settingsInitialized then self:ApplySettingsPanel() end
 end
 
 NSkin:RegisterWindowSkin({
     module = "GameMenu",
     addon = "Blizzard_GameMenu",
     apply = function() return GameMenuSkin:Initialize() end,
+})
+
+NSkin:RegisterWindowSkin({
+    key = "GameMenu.SettingsPanel",
+    module = "GameMenu",
+    addon = "Blizzard_Settings_Shared",
+    apply = function() return GameMenuSkin:InitializeSettingsPanel() end,
 })

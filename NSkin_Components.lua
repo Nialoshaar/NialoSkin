@@ -2566,22 +2566,29 @@ local function ConcealWindowRegion(region)
     end
 end
 
-function NSkin:ConcealWindowArtwork(frame)
+function NSkin:ConcealWindowArtwork(frame, preserveArtwork)
     if not frame then return end
-    ConcealWindowRegion(frame.NineSlice)
-    ConcealWindowRegion(frame.Bg)
-    ConcealWindowRegion(frame.TopTileStreaks)
-    ConcealWindowRegion(frame.TitleBg)
-    ConcealWindowRegion(frame.PortraitContainer)
-    ConcealWindowRegion(frame.portrait)
-    ConcealWindowRegion(frame.portraitFrame)
-    ConcealWindowRegion(frame.topBorderBar)
-    ConcealWindowRegion(frame.topLeftCorner)
-    ConcealWindowRegion(frame.TopRightCorner)
+    preserveArtwork = type(preserveArtwork) == "table"
+        and preserveArtwork or nil
+    local function Conceal(key)
+        if not preserveArtwork or preserveArtwork[key] ~= true then
+            ConcealWindowRegion(frame[key])
+        end
+    end
+    Conceal("NineSlice")
+    Conceal("Bg")
+    Conceal("TopTileStreaks")
+    Conceal("TitleBg")
+    Conceal("PortraitContainer")
+    Conceal("portrait")
+    Conceal("portraitFrame")
+    Conceal("topBorderBar")
+    Conceal("topLeftCorner")
+    Conceal("TopRightCorner")
 end
 
 function NSkin:SkinWindow(frame, backgroundAnchor, style, borderColor,
-    backgroundOwner)
+    backgroundOwner, preserveArtwork)
     if not frame then return nil end
 
     local data = self:GetSkinData(frame, COMPONENT_STATE)
@@ -2591,7 +2598,7 @@ function NSkin:SkinWindow(frame, backgroundAnchor, style, borderColor,
             and titleBackground:GetHeight()
         data.blizzardHeaderHeight = tonumber(height) and height > 0 and height or nil
     end
-    self:ConcealWindowArtwork(frame)
+    self:ConcealWindowArtwork(frame, preserveArtwork)
     style = style or self:GetStyle("window")
     local anchor = backgroundAnchor or frame
     backgroundOwner = backgroundOwner or frame
@@ -2928,11 +2935,12 @@ function NSkin:SkinStandardWindowChrome(definition)
         or self:GetAppearanceBorderColor(
             "window", style, appearanceWindowID, elementID)
     if definition.artworkFrame and definition.artworkFrame ~= frame then
-        self:ConcealWindowArtwork(definition.artworkFrame)
+        self:ConcealWindowArtwork(
+            definition.artworkFrame, definition.preserveArtwork)
     end
     local background, border = self:SkinWindow(
         frame, definition.backgroundAnchor, style, borderColor,
-        definition.backgroundOwner)
+        definition.backgroundOwner, definition.preserveArtwork)
     local header = self:SkinWindowHeader(frame, style.header)
 
     local title = definition.title
